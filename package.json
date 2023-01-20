@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "run": "tsc -p tsconfig.json && node index.js"
+    "go": "tsc -p tsconfig.json && node index.js"
   },
   "type": "module",
   "dependencies": {

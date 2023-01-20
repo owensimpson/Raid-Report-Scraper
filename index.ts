@@ -1,40 +1,35 @@
-import { BungieClient, configure, Tokens } from 'oodestiny';
+import { BungieClient, configure } from 'oodestiny';
 import { config } from 'dotenv'
 import * as puppeteer from 'puppeteer';
 import { BungieMembershipType } from 'oodestiny/schemas';
 
 config();
-const { API_KEY, CLIENT_ID, SECRET, REFRESH } = process.env;
+const { API_KEY, CLIENT_ID, SECRET } = process.env;
 
 configure(API_KEY!, CLIENT_ID!, SECRET!);
 
 /// NAME GOES HERE ///
 const bungieName = 'Newo#9010';
 
-console.log('retrieving access tokens...')
-Tokens.getAccessTokenFromRefreshToken(REFRESH!).then(tokens => {
-    console.log('establishing client...')
-    const client = new BungieClient(tokens.access.value);
-    const [displayName, displayNameCode] = bungieName.split('#');
+console.log('establishing client...')
+const client = new BungieClient();
+const [displayName, displayNameCode] = bungieName.split('#');
 
-    console.log('fetching profile...')
-    // @ts-ignore
-    client.Destiny2.SearchDestinyPlayerByBungieName({
-        membershipType: BungieMembershipType.All
-    }, {
-        displayName,
-        displayNameCode
-    }).then(res => {
-        const { membershipType, membershipId } = res.Response[0]
+console.log('fetching profile...')
+// @ts-ignore
+client.Destiny2.SearchDestinyPlayerByBungieName({
+    membershipType: BungieMembershipType.All
+}, {
+    displayName,
+    displayNameCode
+}).then(res => {
+    const { membershipType, membershipId } = res.Response[0]
 
-        console.log('scraping raid report...')
-        scrape(platformToText(membershipType), membershipId)
-            .then(data => {
-                console.log({bungieName, data})
-            })
-            .catch(console.log)
+    console.log('scraping raid report...')
+    scrape(platformToText(membershipType), membershipId)
+        .then(console.log)
+        .catch(console.log)
 
-    })
 })
 
 function platformToText(platform: number) {
@@ -55,7 +50,9 @@ type RaidInfo = {
     tags: string[]
 }
 
-async function scrape(platform: string, id: string): Promise<RaidInfo[]> {
+type TagsDict = {[raid: string]: string[]};
+
+async function scrape(platform: string, id: string): Promise<TagsDict> {
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     await page.goto(`https://raid.report/${platform}/${id}`,
@@ -77,7 +74,7 @@ async function scrape(platform: string, id: string): Promise<RaidInfo[]> {
     return page.evaluate(() => {
         // select each raid
         const cards = document.querySelectorAll('[class="card"]');
-        const rv: RaidInfo[] = [];
+        const rv: TagsDict = {}
         // @ts-ignore
         for (const card of cards) {
             // select each tag and the raid name
@@ -93,7 +90,7 @@ async function scrape(platform: string, id: string): Promise<RaidInfo[]> {
                 // @ts-ignore
                 obj.tags.push(tag.textContent)
             }
-            rv.push(obj);
+            rv[obj.raid] = obj.tags;
         }
         return rv;
     })
