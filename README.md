@@ -12,7 +12,7 @@ CLIENT_ID="YOUR-BUNGIE-CLIENT-ID"
 SECRET="YOUR-BUNGIE-SECRET"
 ```
 
-Edit the ```index.ts``` file on this line to the bungie name you want
+Edit the ```util.ts``` file on this line to the bungie name you want
 
 ```typescript
 /// NAME GOES HERE ///
