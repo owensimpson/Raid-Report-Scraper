@@ -1,14 +1,9 @@
 import * as puppeteer from 'puppeteer';
 import { Browser } from 'puppeteer';
+import { PGCRInfo, RaidDict, RaidInfo } from './types';
+import { insert, get } from './requests';
 
 type QueueItem = [string, string, (value: RaidDict) => void]
-type RaidInfo = {
-  raid: string;
-  lowmans: number;
-  dots: string[];
-  tags: string[];
-}
-type RaidDict = {[raid: string]: RaidInfo};
 
 export class ScraperClient {
   static MAX_THREADS = 12;
@@ -59,6 +54,7 @@ export class ScraperClient {
     await page.goto(`https://raid.report/${platform}/${id}`,
         { waitUntil: 'load', timeout: 0 })
     // wait for dots to load
+    // @ts-ignore
     return page.waitForSelector('[id="error-dialog-title"]', {
       timeout: 2000
     })
@@ -73,7 +69,7 @@ export class ScraperClient {
         timeout: 0
       })
       await page.setViewport({width: 30000, height: 1920})
-      const info = await page.evaluate(() => {
+      const info = await page.evaluate(async () => {
         // select each raid
         const container = document.querySelector<HTMLElement>('[class="drr-container"]')!
         if (container) {
@@ -88,42 +84,56 @@ export class ScraperClient {
           // select each tag and the raid name
           const raid = card.querySelector('[class="card-title black-text-shadow"]')?.textContent
               ?? '';
-          const tags: NodeListOf<HTMLSpanElement> = card.querySelectorAll('[class="new badge truncate drr-tag"]');
           const dots: NodeListOf<HTMLAnchorElement> = card.querySelectorAll('[class="clickable activity-dot"]');
           const obj: RaidInfo = {
             raid,
-            lowmans: 0,
-            dots: [],
-            tags: []
+            tags: [],
           }
-          for (const dot of dots) {
+
+          await Promise.all(Array.from(dots).map(dot => {
             // @ts-ignore
             const href = dot.href.animVal;
-            obj.dots.push(href);
-          }
-          for (const tag of tags) {
-            obj.tags.push(tag.textContent!)
-          }
+            return get(`http://localhost:8000${href}`)
+            .then(response => response.json())
+            .then(async (res: PGCRInfo) => {
+              obj.tags.push({
+                raid,
+                ...(res.id ? {id: res.id, tags: res.tags} : await this.scrapeDot(href))
+              })
+            })
+            .catch(console.error);
+          }))
           rv[obj.raid] = obj;
         }
         return rv;
       }, {timeout: 0 });
 
-      await Promise.all(Object.keys(info).map(raid => (
-         info[raid].dots.map(async dot => (
-             await fetch('http://localhost:8000/pgcr', {
-               method: 'POST',
-               headers: {
-                 'Accept': 'application/json',
-                 'Content-Type': 'application/json'
-               },
-               body: JSON.stringify({id: dot.split("/")[2], tags: ["test"]})
-             })
-         ))
-      )));
       page.close().catch(console.error);
       return info;
     })
 
+    }
+
+  private async scrapeDot(ref: string): Promise<PGCRInfo> {
+    const page = await (await this.browser).newPage();
+    await page.goto(`https://raid.report${ref}`);
+    await page.waitForSelector('[class="TBD"]', {
+      timeout: 0
+    })
+    return page.evaluate(() => {
+      const returnObject = {
+        id: parseInt(ref.split("/")[2]),
+        tags: [],
+      }
+      const tags: NodeListOf<HTMLSpanElement> = document.querySelectorAll('[class="TBD"]');
+      for (const tag of tags) {
+        // @ts-ignore
+        returnObject.tags.push(tag.textContent!)
+      }
+      insert(returnObject);
+      return returnObject;
+    });
+
   }
+
 }

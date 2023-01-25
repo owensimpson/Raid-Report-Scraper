@@ -18,9 +18,9 @@ app.use(express.json());
 app.get("/pgcr/:id", async (req, res) => {
     const db = await dbPromise;
     const id = req.params["id"];
-    const tags = await db.all(`SELECT * FROM PGCRTable WHERE id=?;`, id);
-    console.log(tags)
-    //res.status(200).json({id, tags: tags.split("*")});
+    const [dbRes] = await db.all(`SELECT * FROM PGCRTable WHERE id=?;`, id);
+    if (dbRes) res.status(200).json({id, tags: dbRes.tags.split("*")});
+    else res.status(404).json({});
 });
 
 app.post("/pgcr", async (req, res) => {

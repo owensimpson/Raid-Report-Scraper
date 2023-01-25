@@ -10,8 +10,8 @@ configure(API_KEY!, CLIENT_ID!, SECRET!);
 
 const bungie = new BungieClient();
 const client = new ScraperClient();
-// @ts-ignore
-bungie.GroupV2.GetMembersOfGroup({groupId: 4807278}).then(gr => {
+
+bungie.GroupV2.GetMembersOfGroup({currentpage: 0, groupId: '4807278'}).then(gr => {
   return [gr.Response.results[0]].map(member =>
       client.scrapeProfile(member.destinyUserInfo.membershipId, platformToText(member.destinyUserInfo.membershipType)))
 }).then(async arr => arr.map(async promise => console.log(await promise)))
